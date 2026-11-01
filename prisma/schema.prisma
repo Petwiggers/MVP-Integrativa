@@ -1,0 +1,173 @@
+// Modelo de dados do Totem de Escuta.
+//
+// Regras de privacidade refletidas aqui:
+// - Report não tem IP, user-agent nem horário: apenas a DATA (createdOn @db.Date).
+// - IDs são UUID aleatórios (nada de autoincrement que revele ordem de chegada).
+// - Conteúdo (relato, nome, setor, contato, respostas) é armazenado cifrado (*Enc).
+// - O protocolo é guardado como HMAC (busca) + cópia cifrada (exibição no painel).
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  ATENDENTE
+}
+
+enum Identification {
+  ANONIMO
+  IDENTIFICADO
+  CONTATO
+}
+
+enum Theme {
+  TRABALHO
+  LIDERANCA
+  COLEGAS
+  SAUDE_MENTAL
+  FAMILIA
+  FINANCAS
+  OUTRO
+}
+
+enum ReportStatus {
+  NOVO
+  EM_ATENDIMENTO
+  RESPONDIDO
+  ENCERRADO
+}
+
+enum AuditAction {
+  REPORT_VIEW
+  REPORT_STATUS_CHANGE
+  REPORT_REPLY
+  REPORT_IDENTITY_VIEW
+  REPORT_DELETE_RETENTION
+  LOGIN_SUCCESS
+  LOGIN_FAILURE
+  LOGIN_LOCKED
+  LOGOUT
+  USER_CREATE
+  USER_UPDATE
+  DEVICE_CREATE
+  DEVICE_PAIRING_CODE
+  DEVICE_REVOKE
+  SETTINGS_UPDATE
+}
+
+model User {
+  id             String    @id @default(uuid()) @db.Uuid
+  email          String    @unique
+  name           String
+  passwordHash   String
+  role           Role      @default(ATENDENTE)
+  active         Boolean   @default(true)
+  failedAttempts Int       @default(0)
+  lockoutCount   Int       @default(0)
+  lockedUntil    DateTime?
+  lastLoginAt    DateTime?
+  createdAt      DateTime  @default(now())
+
+  sessions Session[]
+  replies  ReportReply[]
+  audits   AuditLog[]
+}
+
+model Session {
+  id         String   @id @default(uuid()) @db.Uuid
+  tokenHash  String   @unique
+  userId     String   @db.Uuid
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  expiresAt  DateTime
+  lastSeenAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model Device {
+  id               String    @id @default(uuid()) @db.Uuid
+  name             String
+  tokenHash        String?   @unique
+  pairingCodeHash  String?   @unique
+  pairingExpiresAt DateTime?
+  pairedAt         DateTime?
+  revokedAt        DateTime?
+  createdAt        DateTime  @default(now())
+
+  reports Report[]
+}
+
+model Report {
+  id             String         @id @db.Uuid
+  deviceId       String         @db.Uuid
+  device         Device         @relation(fields: [deviceId], references: [id], onDelete: Restrict)
+  /// Somente a data (sem horário) para não permitir identificação por turno.
+  createdOn      DateTime       @db.Date
+  identification Identification @default(ANONIMO)
+  mood           Int
+  theme          Theme?
+  urgent         Boolean        @default(false)
+  status         ReportStatus   @default(NOVO)
+  bodyEnc        String?
+  nameEnc        String?
+  sectorEnc      String?
+  contactEnc     String?
+  protocolHash   String         @unique
+  protocolEnc    String
+  consentVersion Int
+  closedOn       DateTime?      @db.Date
+
+  replies ReportReply[]
+
+  @@index([urgent, createdOn])
+  @@index([status])
+  @@index([theme])
+}
+
+model ReportReply {
+  id        String   @id @db.Uuid
+  reportId  String   @db.Uuid
+  report    Report   @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  authorId  String   @db.Uuid
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  bodyEnc   String
+  createdAt DateTime @default(now())
+
+  @@index([reportId])
+}
+
+/// Append-only. Nunca contém conteúdo de relatos, apenas metadados da ação.
+model AuditLog {
+  id        String      @id @default(uuid()) @db.Uuid
+  userId    String?     @db.Uuid
+  user      User?       @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action    AuditAction
+  /// Sem FK: o registro de auditoria sobrevive à exclusão do relato.
+  reportId  String?     @db.Uuid
+  details   Json?
+  createdAt DateTime    @default(now())
+
+  @@index([reportId])
+  @@index([createdAt])
+}
+
+model Setting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}
+
+model RateLimitBucket {
+  key     String   @id
+  count   Int
+  resetAt DateTime
+
+  @@index([resetAt])
+}

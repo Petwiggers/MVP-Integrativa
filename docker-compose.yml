@@ -1,0 +1,41 @@
+# Apenas para desenvolvimento local. Produção: Vercel (gru1) + Supabase (sa-east-1).
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: totem
+      POSTGRES_PASSWORD: totem_dev
+      POSTGRES_DB: totem
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    # UTC como no Supabase. Sem log de comandos SQL (evita parâmetros em log, mesmo cifrados).
+    command: ["postgres", "-c", "timezone=UTC", "-c", "log_statement=none", "-c", "log_min_error_statement=panic"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U totem -d totem"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://totem:totem_dev@db:5432/totem
+      DIRECT_URL: postgresql://totem:totem_dev@db:5432/totem
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    command: sh -c "npx prisma migrate deploy && npm run dev -- --hostname 0.0.0.0"
+    profiles: ["app"]
+
+volumes:
+  pgdata:

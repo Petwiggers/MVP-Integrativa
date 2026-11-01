@@ -1,0 +1,79 @@
+@import "tailwindcss";
+
+/* Paleta acolhedora e calma; contraste AA sobre o fundo. */
+@theme {
+  --color-paper: #f6f2ec;
+  --color-card: #fffdf9;
+  --color-ink: #1f2a2b;
+  --color-muted: #5b6667;
+  --color-line: #e2dbd1;
+  --color-brand: #24575a;
+  --color-brand-dark: #1a4245;
+  --color-brand-soft: #dcebe9;
+  --color-accent: #b9653b;
+  --color-alert: #9f2f3a;
+  --color-alert-soft: #f7e3e3;
+
+  --font-sans: var(--font-atkinson), ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif;
+}
+
+html,
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+}
+
+/* ---- Modo totem: sem zoom, sem seleção, sem menus e sem "puxar para atualizar" ---- */
+.totem-root {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  overscroll-behavior: none;
+}
+
+.totem-root img,
+.totem-root svg {
+  -webkit-user-drag: none;
+  pointer-events: none;
+}
+
+.totem-root button svg {
+  pointer-events: none;
+}
+
+html:has(.totem-root),
+html:has(.totem-root) body {
+  overscroll-behavior: none;
+  overflow: hidden;
+  height: 100%;
+  font-size: 22px;
+}
+
+@media (min-width: 900px) and (min-height: 700px) {
+  html:has(.totem-root) {
+    font-size: 24px;
+  }
+}
+
+@keyframes totem-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.totem-screen {
+  animation: totem-fade-in 220ms ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .totem-screen {
+    animation: none;
+  }
+}
