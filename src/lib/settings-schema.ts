@@ -2,7 +2,7 @@ import { z } from "zod";
 
 // Configurações editáveis no /admin. Valores padrão com marcadores a substituir.
 export const settingsSchema = z.object({
-  companyName: z.string().trim().min(1).max(80).default("[NOME DA EMPRESA]"),
+  companyName: z.string().trim().min(1).max(80).default("Cuida+"),
   hrContact: z
     .string()
     .trim()
